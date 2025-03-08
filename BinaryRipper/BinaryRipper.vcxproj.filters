@@ -24,40 +24,37 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\BufferTapper\BinaryRipper\BufferOverflowDetector.h">
-      <Filter>Source Files\src\includes</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\BufferTapper\BinaryRipper\FileInputValidator.h">
-      <Filter>Source Files\src\includes</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\BufferTapper\BinaryRipper\resource.h">
       <Filter>Source Files\src\includes</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\BufferTapper\BinaryRipper\hook.h">
-      <Filter>Source Files\src\includes</Filter>
+    <ClInclude Include="src\includes\hook.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\BufferTapper\BinaryRipper\ThreadPoolHook.h">
-      <Filter>Source Files\src\includes</Filter>
+    <ClInclude Include="src\includes\BufferOverFlowDetector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\includes\FileInputValidator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\includes\resource.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="BasicOverflowTest.cpp">
+    <ClCompile Include="testcases\BasicOverflowTest.cpp">
       <Filter>Source Files\testcases</Filter>
     </ClCompile>
-    <ClCompile Include="EdgeCases.cpp">
+    <ClCompile Include="testcases\EdgeCases.cpp">
       <Filter>Source Files\testcases</Filter>
     </ClCompile>
-    <ClCompile Include="PerformanceTests.cpp">
+    <ClCompile Include="testcases\PerformanceTests.cpp">
       <Filter>Source Files\testcases</Filter>
     </ClCompile>
-    <ClCompile Include="FalsePositiveTests.cpp">
+    <ClCompile Include="testcases\FalsePositiveTests.cpp">
       <Filter>Source Files\testcases</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\BufferTapper\BinaryRipper\main.cpp">
-      <Filter>Source Files\src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\BufferTapper\BinaryRipper\buffertapper.cpp">
-      <Filter>Source Files\src</Filter>
+    <ClCompile Include="src\main.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

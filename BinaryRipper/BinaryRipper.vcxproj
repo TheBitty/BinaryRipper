@@ -127,19 +127,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\BufferTapper\BinaryRipper\BufferOverflowDetector.h" />
-    <ClInclude Include="..\..\BufferTapper\BinaryRipper\FileInputValidator.h" />
-    <ClInclude Include="..\..\BufferTapper\BinaryRipper\hook.h" />
     <ClInclude Include="..\..\BufferTapper\BinaryRipper\resource.h" />
-    <ClInclude Include="..\..\BufferTapper\BinaryRipper\ThreadPoolHook.h" />
+    <ClInclude Include="src\includes\BufferOverFlowDetector.h" />
+    <ClInclude Include="src\includes\FileInputValidator.h" />
+    <ClInclude Include="src\includes\hook.h" />
+    <ClInclude Include="src\includes\resource.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\BufferTapper\BinaryRipper\buffertapper.cpp" />
-    <ClCompile Include="..\..\BufferTapper\BinaryRipper\main.cpp" />
-    <ClCompile Include="BasicOverflowTest.cpp" />
-    <ClCompile Include="EdgeCases.cpp" />
-    <ClCompile Include="FalsePositiveTests.cpp" />
-    <ClCompile Include="PerformanceTests.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="testcases\BasicOverflowTest.cpp" />
+    <ClCompile Include="testcases\EdgeCases.cpp" />
+    <ClCompile Include="testcases\FalsePositiveTests.cpp" />
+    <ClCompile Include="testcases\PerformanceTests.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
