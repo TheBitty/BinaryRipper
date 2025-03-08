@@ -135,8 +135,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\BufferTapper\BinaryRipper\buffertapper.cpp" />
-    <ClCompile Include="..\..\BufferTapper\BinaryRipper\HookHeaderTest.cpp" />
     <ClCompile Include="..\..\BufferTapper\BinaryRipper\main.cpp" />
+    <ClCompile Include="BasicOverflowTest.cpp" />
+    <ClCompile Include="EdgeCases.cpp" />
+    <ClCompile Include="FalsePositiveTests.cpp" />
+    <ClCompile Include="PerformanceTests.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
