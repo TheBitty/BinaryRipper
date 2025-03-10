@@ -7,7 +7,7 @@
 #include <fstream>
 
 class BufferOverflowDetector {
-private:
+public:  // Changed from private to public
     std::string m_executablePath; // Stores the file path to the executable being tested
     size_t m_maxStringLength;     // Maximum length of input string to test
     size_t m_increment;           // How much to increase input length between tests

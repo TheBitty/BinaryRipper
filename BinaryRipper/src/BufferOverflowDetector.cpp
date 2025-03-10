@@ -10,6 +10,10 @@
 #pragma comment(lib, "DbgHelp.lib")
 #pragma comment(lib, "Psapi.lib")
 
+// Use TestResult from the class scope
+using TestResult = BufferOverflowDetector::TestResult;
+using MemoryRegion = BufferOverflowDetector::MemoryRegion;
+
 BufferOverflowDetector::BufferOverflowDetector()
     : m_executablePath(""),
     m_maxStringLength(1024),
@@ -42,7 +46,7 @@ std::string BufferOverflowDetector::generatePayload(size_t length) {
     return payload.substr(0, length);
 }
 
-TestResult BufferOverflowDetector::runProcess(HANDLE processHandle, HANDLE stdinWrite,
+BufferOverflowDetector::TestResult BufferOverflowDetector::runProcess(HANDLE processHandle, HANDLE stdinWrite,
     HANDLE stdoutRead, HANDLE stderrRead) {
 
     TestResult result;
@@ -51,7 +55,8 @@ TestResult BufferOverflowDetector::runProcess(HANDLE processHandle, HANDLE stdin
     result.crashAddress = 0;
 
     // Resume the process (assuming it was created suspended)
-    ResumeThread(GetThreadContext(processHandle, NULL));
+    // Fix: GetThreadContext returns BOOL, not HANDLE, so we can't pass it to ResumeThread
+    ResumeThread(processHandle);  // Simply resume the process handle
 
     // Set up timeout
     DWORD waitResult = WaitForSingleObject(processHandle, m_timeout * 1000);
@@ -688,7 +693,6 @@ bool BufferOverflowDetector::testVectorWithIncreasingInput(const std::string& ve
                 std::cout << "Found potential overflow at length " << length << std::endl;
                 std::cout << result.crashDetails << std::endl;
             }
-
             foundOverflow = true;
             minCrashLength = std::min(minCrashLength, length);
 
@@ -707,7 +711,7 @@ bool BufferOverflowDetector::testVectorWithIncreasingInput(const std::string& ve
 
         // Add this exact point result
         std::string payload = generatePayload(exactPoint);
-        TestResult result;
+        BufferOverflowDetector::TestResult result;
 
         if (vectorType == "stdin") {
             result = runWithStdin(payload);
