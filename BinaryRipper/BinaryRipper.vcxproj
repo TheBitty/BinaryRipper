@@ -137,7 +137,7 @@
   <ItemGroup>
     <ClCompile Include="src\BufferOverflowDetector.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\MemoryHooks.cpp" />
+    <ClCompile Include="src\SimpleHooks.cpp" />
     <ClCompile Include="testcases\BasicOverflowTest.cpp" />
     <ClCompile Include="testcases\EdgeCases.cpp" />
     <ClCompile Include="testcases\FalsePositiveTests.cpp" />

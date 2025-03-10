@@ -42,12 +42,7 @@ void printMenu() {
 // Compile test case as a standalone executable
 bool compileTestCase(const std::string& sourceFile, const std::string& outputFile) {
     // Check if Visual Studio environment is available
-    const char* vsPath = getenv("VS_PATH");
-    if (!vsPath) {
-        std::cout << "VS_PATH environment variable not set." << std::endl;
-        std::cout << "Please set it to your Visual Studio installation directory." << std::endl;
-        return false;
-    }
+    std::string vsPath = "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community";
 
     // Create compilation command
     std::string command = "\"" + std::string(vsPath) + "\\VC\\Auxiliary\\Build\\vcvars64.bat\" && cl.exe /EHsc /DSTANDALONE_TEST " +
