@@ -9,6 +9,7 @@
 #include <vector>
 #include <iomanip>
 #include <ctime>
+#include <iostream>
 
 // Forward declarations to avoid double-definitions
 typedef void* (*MallocFuncType)(size_t);
@@ -405,22 +406,25 @@ public:
         bool success = true;
 
         // Hook memory allocation functions
-        success &= m_hook->hook<MallocFuncType>(
+        // The hook template function likely expects different parameter types
+        // than what we're providing. We need to use the correct template parameters
+        // that match the function signature in ThreadPoolHook::hook
+        success &= m_hook->hook(
             (MallocFuncType)&malloc,
             (MallocFuncType)&hooked_malloc,
             &original_malloc);
 
-        success &= m_hook->hook<FreeFuncType>(
+        success &= m_hook->hook(
             (FreeFuncType)&free,
             (FreeFuncType)&hooked_free,
             &original_free);
 
-        success &= m_hook->hook<ReallocFuncType>(
+        success &= m_hook->hook(
             (ReallocFuncType)&realloc,
             (ReallocFuncType)&hooked_realloc,
             &original_realloc);
 
-        success &= m_hook->hook<CallocFuncType>(
+        success &= m_hook->hook(
             (CallocFuncType)&calloc,
             (CallocFuncType)&hooked_calloc,
             &original_calloc);
@@ -437,22 +441,22 @@ public:
         bool success = true;
 
         // Hook string functions
-        success &= m_hook->hook<StrcpyFuncType>(
+        success &= m_hook->hook(
             (StrcpyFuncType)&strcpy,
             (StrcpyFuncType)&hooked_strcpy,
             &original_strcpy);
 
-        success &= m_hook->hook<StrncpyFuncType>(
+        success &= m_hook->hook(
             (StrncpyFuncType)&strncpy,
             (StrncpyFuncType)&hooked_strncpy,
             &original_strncpy);
 
-        success &= m_hook->hook<StrcatFuncType>(
+        success &= m_hook->hook(
             (StrcatFuncType)&strcat,
             (StrcatFuncType)&hooked_strcat,
             &original_strcat);
 
-        success &= m_hook->hook<StrncatFuncType>(
+        success &= m_hook->hook(
             (StrncatFuncType)&strncat,
             (StrncatFuncType)&hooked_strncat,
             &original_strncat);
@@ -469,17 +473,17 @@ public:
         bool success = true;
 
         // Hook memory operations
-        success &= m_hook->hook<MemcpyFuncType>(
+        success &= m_hook->hook(
             (MemcpyFuncType)&memcpy,
             (MemcpyFuncType)&hooked_memcpy,
             &original_memcpy);
 
-        success &= m_hook->hook<MemmoveFuncType>(
+        success &= m_hook->hook(
             (MemmoveFuncType)&memmove,
             (MemmoveFuncType)&hooked_memmove,
             &original_memmove);
 
-        success &= m_hook->hook<MemsetFuncType>(
+        success &= m_hook->hook(
             (MemsetFuncType)&memset,
             (MemsetFuncType)&hooked_memset,
             &original_memset);

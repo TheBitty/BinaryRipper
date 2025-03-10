@@ -659,16 +659,13 @@ size_t BufferOverflowDetector::findExactOverflowPoint(size_t start, size_t end, 
 bool BufferOverflowDetector::testVectorWithIncreasingInput(const std::string& vectorType) {
     bool foundOverflow = false;
     size_t minCrashLength = m_maxStringLength;
-
     // Test with increasing input sizes
     for (size_t length = 1; length <= m_maxStringLength; length += m_increment) {
         std::string payload = generatePayload(length);
         TestResult result;
-
         if (m_verbose) {
             std::cout << "Testing " << vectorType << " with input length " << length << std::endl;
         }
-
         // Run with the appropriate vector type
         if (vectorType == "stdin") {
             result = runWithStdin(payload);
@@ -683,10 +680,8 @@ bool BufferOverflowDetector::testVectorWithIncreasingInput(const std::string& ve
             std::cerr << "Unknown vector type: " << vectorType << std::endl;
             return false;
         }
-
         // Store the result
         m_results.push_back(result);
-
         // Check if we found an overflow
         if (result.status == "crashed" || result.status == "memory_corruption") {
             if (m_verbose) {
@@ -694,8 +689,7 @@ bool BufferOverflowDetector::testVectorWithIncreasingInput(const std::string& ve
                 std::cout << result.crashDetails << std::endl;
             }
             foundOverflow = true;
-            minCrashLength = std::min(minCrashLength, length);
-
+            minCrashLength = (minCrashLength < length) ? minCrashLength : length;
             // Stop testing larger inputs once we find a crash
             break;
         }
@@ -711,7 +705,7 @@ bool BufferOverflowDetector::testVectorWithIncreasingInput(const std::string& ve
 
         // Add this exact point result
         std::string payload = generatePayload(exactPoint);
-        BufferOverflowDetector::TestResult result;
+        TestResult result;
 
         if (vectorType == "stdin") {
             result = runWithStdin(payload);
