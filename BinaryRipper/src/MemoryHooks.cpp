@@ -11,6 +11,9 @@
 #include <ctime>
 #include <iostream>
 
+#define _CRT_SECURE_NO_WARNINGS
+// All other includes and code below
+
 // Forward declarations to avoid double-definitions
 typedef void* (*MallocFuncType)(size_t);
 typedef void (*FreeFuncType)(void*);

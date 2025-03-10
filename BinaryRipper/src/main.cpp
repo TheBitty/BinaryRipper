@@ -4,6 +4,9 @@
 #include <filesystem>
 #include "includes/BufferOverFlowDetector.h"
 
+#define _CRT_SECURE_NO_WARNINGS
+// All other includes and code below
+
 // External function declarations from MemoryHooks.cpp
 extern "C" {
     bool SetupAllHooks(bool verbose);
@@ -65,6 +68,7 @@ void runBasicOverflowTest() {
     std::string exePath = "testcases\\BasicOverflowTest.exe";
     std::string srcPath = "testcases\\BasicOverflowTest.cpp";
 
+    // Check if the executable exists, if not, compile it
     if (!std::filesystem::exists(exePath)) {
         if (!compileTestCase(srcPath, exePath)) {
             std::cout << "Failed to compile test case. Check compilation errors." << std::endl;
