@@ -659,13 +659,15 @@ size_t BufferOverflowDetector::findExactOverflowPoint(size_t start, size_t end, 
 bool BufferOverflowDetector::testVectorWithIncreasingInput(const std::string& vectorType) {
     bool foundOverflow = false;
     size_t minCrashLength = m_maxStringLength;
+
     // Test with increasing input sizes
     for (size_t length = 1; length <= m_maxStringLength; length += m_increment) {
         std::string payload = generatePayload(length);
         TestResult result;
-        if (m_verbose) {
-            std::cout << "Testing " << vectorType << " with input length " << length << std::endl;
-        }
+
+        std::cout << "\n------------------------------------------------" << std::endl;
+        std::cout << "Testing " << vectorType << " with input length " << length << std::endl;
+
         // Run with the appropriate vector type
         if (vectorType == "stdin") {
             result = runWithStdin(payload);
@@ -680,44 +682,41 @@ bool BufferOverflowDetector::testVectorWithIncreasingInput(const std::string& ve
             std::cerr << "Unknown vector type: " << vectorType << std::endl;
             return false;
         }
+
         // Store the result
         m_results.push_back(result);
-        // Check if we found an overflow
+
+        // Use colored output and detailed reporting for crashes
         if (result.status == "crashed" || result.status == "memory_corruption") {
-            if (m_verbose) {
-                std::cout << "Found potential overflow at length " << length << std::endl;
-                std::cout << result.crashDetails << std::endl;
+            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_INTENSITY);
+            std::cout << "\n!!! BUFFER OVERFLOW DETECTED !!!" << std::endl;
+            std::cout << "Input length: " << length << std::endl;
+            std::cout << "Crash details: " << result.crashDetails << std::endl;
+            std::cout << "Return code: " << result.returnCode << std::endl;
+            if (!result.stdout_output.empty()) {
+                std::cout << "\nLast stdout output: " << result.stdout_output << std::endl;
             }
+            if (!result.stderr_output.empty()) {
+                std::cout << "\nLast stderr output: " << result.stderr_output << std::endl;
+            }
+            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+
             foundOverflow = true;
             minCrashLength = (minCrashLength < length) ? minCrashLength : length;
             // Stop testing larger inputs once we find a crash
             break;
         }
+        else {
+            std::cout << "Status: " << result.status << ", Return code: " << result.returnCode << std::endl;
+        }
     }
 
-    // If we found an overflow, perform binary search to find the exact point
-    if (foundOverflow && minCrashLength > 1) {
-        size_t exactPoint = findExactOverflowPoint(1, minCrashLength, vectorType);
-
-        if (m_verbose) {
-            std::cout << "Exact overflow point for " << vectorType << ": " << exactPoint << " bytes" << std::endl;
-        }
-
-        // Add this exact point result
-        std::string payload = generatePayload(exactPoint);
-        TestResult result;
-
-        if (vectorType == "stdin") {
-            result = runWithStdin(payload);
-        }
-        else if (vectorType == "command_line") {
-            result = runWithCommandLineArgs(payload);
-        }
-        else if (vectorType == "file_input") {
-            result = runWithFileInput(payload);
-        }
-
-        m_results.push_back(result);
+    // Display summary of findings
+    if (foundOverflow) {
+        std::cout << "\n==================================================" << std::endl;
+        std::cout << "BUFFER OVERFLOW SUMMARY FOR " << vectorType << std::endl;
+        std::cout << "Minimum crash length: " << minCrashLength << " bytes" << std::endl;
+        std::cout << "==================================================" << std::endl;
     }
 
     return foundOverflow;

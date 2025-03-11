@@ -1,274 +1,345 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "includes/hook.h"
 #include <Windows.h>
-#include <iostream>
-#include <fstream>
-#include <string>
 
-// Global debug log with direct buffer to avoid memory allocations
-std::ofstream g_debug_log;
-char g_log_buffer[1024];
+// ----- Log System: Using direct Windows API to avoid allocations -----
+HANDLE g_log_file = INVALID_HANDLE_VALUE;
+char g_log_buffer[512]; // Static buffer for log messages
 
-// Function to initialize debug log
-void init_debug_log() {
-    g_debug_log.open("hook_debug.log", std::ios::out | std::ios::trunc);
-    g_debug_log << "Hook debugging started at " << GetTickCount64() << std::endl;
-    g_debug_log.flush();
-}
+// Safe minimal logging with no memory allocations
+void safe_log(const char* message) {
+    if (g_log_file != INVALID_HANDLE_VALUE) {
+        DWORD written = 0;
+        DWORD time = GetTickCount();
 
-// Safe logging function that avoids memory allocations
-void debug_log_safe(const char* message) {
-    if (g_debug_log.is_open()) {
-        g_debug_log << "[" << GetTickCount64() << "] " << message << std::endl;
-        g_debug_log.flush();
+        // Format timestamp
+        int len = sprintf_s(g_log_buffer, "[%u] %s\r\n", time, message);
+
+        // Write directly to file handle
+        WriteFile(g_log_file, g_log_buffer, len, &written, NULL);
     }
 }
 
-// Function type definitions
+// ----- Function Types and Original Pointers -----
 typedef void* (__cdecl* MallocFuncType)(size_t);
 typedef void(__cdecl* FreeFuncType)(void*);
 typedef void* (__cdecl* ReallocFuncType)(void*, size_t);
 typedef void* (__cdecl* CallocFuncType)(size_t, size_t);
 
-// Original function pointers - initialized before hooking
-MallocFuncType original_malloc = nullptr;
-FreeFuncType original_free = nullptr;
-ReallocFuncType original_realloc = nullptr;
-CallocFuncType original_calloc = nullptr;
+// Original function pointers
+static MallocFuncType original_malloc = NULL;
+static FreeFuncType original_free = NULL;
+static ReallocFuncType original_realloc = NULL;
+static CallocFuncType original_calloc = NULL;
 
-// Thread-local flags for recursion prevention
-thread_local bool in_malloc_hook = false;
-thread_local bool in_free_hook = false;
-thread_local bool in_realloc_hook = false;
-thread_local bool in_calloc_hook = false;
+// ----- Recursion Prevention: Using per-thread depth counters -----
+thread_local int malloc_depth = 0;
+thread_local int free_depth = 0;
+thread_local int realloc_depth = 0;
+thread_local int calloc_depth = 0;
 
-// Get direct pointers to C runtime functions
-bool initialize_original_functions() {
-    debug_log_safe("Initializing original function pointers");
+// ----- Hook Functions: Ultra minimal implementations -----
 
-    // Get handles to required DLLs - we'll try multiple potential DLLs
-    const char* potential_dlls[] = { "ucrtbase.dll", "msvcrt.dll", "libucrt.dll" };
-    HMODULE crtHandle = nullptr;
-
-    for (const char* dllName : potential_dlls) {
-        crtHandle = GetModuleHandleA(dllName);
-        if (crtHandle) {
-            sprintf_s(g_log_buffer, "Found CRT in: %s", dllName);
-            debug_log_safe(g_log_buffer);
-            break;
-        }
-    }
-
-    if (!crtHandle) {
-        debug_log_safe("ERROR: Could not find CRT DLL, trying to load ucrtbase.dll explicitly");
-        crtHandle = LoadLibraryA("ucrtbase.dll");
-        if (!crtHandle) {
-            debug_log_safe("CRITICAL ERROR: Failed to load any CRT DLL");
-            return false;
-        }
-    }
-
-    // Save original function pointers
-    original_malloc = (MallocFuncType)GetProcAddress(crtHandle, "malloc");
-    original_free = (FreeFuncType)GetProcAddress(crtHandle, "free");
-    original_realloc = (ReallocFuncType)GetProcAddress(crtHandle, "realloc");
-    original_calloc = (CallocFuncType)GetProcAddress(crtHandle, "calloc");
-
-    // Validate all function pointers
-    bool success = (original_malloc != nullptr && original_free != nullptr &&
-        original_realloc != nullptr && original_calloc != nullptr);
-
-    if (!success) {
-        debug_log_safe("ERROR: Failed to get one or more function addresses");
-        return false;
-    }
-
-    debug_log_safe("Successfully initialized all CRT function pointers");
-    return true;
-}
-
-// Hooked function implementations - simplified to avoid recursion issues
 void* __cdecl hooked_malloc(size_t size) {
-    // Check for recursion
-    if (in_malloc_hook) {
-        return original_malloc(size); // Direct call with no logging to avoid recursion
+    // Recursion guard - use counter instead of boolean
+    malloc_depth++;
+
+    // Always go straight to original for nested calls
+    if (malloc_depth > 1) {
+        void* result = original_malloc ? original_malloc(size) :
+            HeapAlloc(GetProcessHeap(), 0, size);
+        malloc_depth--;
+        return result;
     }
 
-    in_malloc_hook = true;
-    void* ptr = original_malloc(size);
+    // First get the result
+    void* ptr = original_malloc ? original_malloc(size) :
+        HeapAlloc(GetProcessHeap(), 0, size);
 
-    // Only use safe logging that doesn't allocate memory
-    sprintf_s(g_log_buffer, "malloc(%zu) = %p", size, ptr);
-    debug_log_safe(g_log_buffer);
+    // Then log with minimal operations
+    if (ptr && g_log_file != INVALID_HANDLE_VALUE) {
+        sprintf_s(g_log_buffer, "malloc(%zu) = %p", size, ptr);
+        safe_log(g_log_buffer);
+    }
 
-    in_malloc_hook = false;
+    malloc_depth--;
     return ptr;
 }
 
 void __cdecl hooked_free(void* ptr) {
-    if (in_free_hook) {
-        original_free(ptr);
+    // Skip null pointers
+    if (!ptr) {
+        if (original_free) original_free(ptr);
         return;
     }
 
-    in_free_hook = true;
+    // Recursion guard
+    free_depth++;
 
+    // Always go straight to original for nested calls
+    if (free_depth > 1) {
+        if (original_free)
+            original_free(ptr);
+        else
+            HeapFree(GetProcessHeap(), 0, ptr);
+        free_depth--;
+        return;
+    }
+
+    // Log first, then free
     sprintf_s(g_log_buffer, "free(%p)", ptr);
-    debug_log_safe(g_log_buffer);
+    safe_log(g_log_buffer);
 
-    original_free(ptr);
-    in_free_hook = false;
+    // Perform the free
+    if (original_free)
+        original_free(ptr);
+    else
+        HeapFree(GetProcessHeap(), 0, ptr);
+
+    free_depth--;
 }
 
 void* __cdecl hooked_realloc(void* ptr, size_t size) {
-    if (in_realloc_hook) {
-        return original_realloc(ptr, size);
+    // Recursion guard
+    realloc_depth++;
+
+    // Always go straight to original for nested calls
+    if (realloc_depth > 1) {
+        void* result = original_realloc ? original_realloc(ptr, size) : NULL;
+        realloc_depth--;
+        return result;
     }
 
-    in_realloc_hook = true;
-    void* newPtr = original_realloc(ptr, size);
+    // First get the result
+    void* newptr = original_realloc ? original_realloc(ptr, size) : NULL;
 
-    sprintf_s(g_log_buffer, "realloc(%p, %zu) = %p", ptr, size, newPtr);
-    debug_log_safe(g_log_buffer);
+    // Log with minimal operations
+    if (g_log_file != INVALID_HANDLE_VALUE) {
+        sprintf_s(g_log_buffer, "realloc(%p, %zu) = %p", ptr, size, newptr);
+        safe_log(g_log_buffer);
+    }
 
-    in_realloc_hook = false;
-    return newPtr;
+    realloc_depth--;
+    return newptr;
 }
 
-void* __cdecl hooked_calloc(size_t num, size_t size) {
-    if (in_calloc_hook) {
-        return original_calloc(num, size);
+void* __cdecl hooked_calloc(size_t count, size_t size) {
+    // Recursion guard
+    calloc_depth++;
+
+    // Always go straight to original for nested calls
+    if (calloc_depth > 1) {
+        void* result = original_calloc ? original_calloc(count, size) : NULL;
+        calloc_depth--;
+        return result;
     }
 
-    in_calloc_hook = true;
-    void* ptr = original_calloc(num, size);
+    // First get the result
+    void* ptr = original_calloc ? original_calloc(count, size) : NULL;
 
-    sprintf_s(g_log_buffer, "calloc(%zu, %zu) = %p", num, size, ptr);
-    debug_log_safe(g_log_buffer);
+    // Log with minimal operations
+    if (ptr && g_log_file != INVALID_HANDLE_VALUE) {
+        sprintf_s(g_log_buffer, "calloc(%zu, %zu) = %p", count, size, ptr);
+        safe_log(g_log_buffer);
+    }
 
-    in_calloc_hook = false;
+    calloc_depth--;
     return ptr;
 }
 
-// FunctionHooker for hook installation
-class FunctionHooker {
-private:
-    ThreadPoolHook* m_hook;
-    bool m_verbose;
-    bool m_initialized;
+// ----- Function to get CRT pointers -----
+BOOL initialize_crt_functions() {
+    // Try multiple possible CRT DLLs
+    const char* potential_dlls[] = { "ucrtbase.dll", "msvcrt.dll", "api-ms-win-crt-heap-l1-1-0.dll" };
+    HMODULE crt_handle = NULL;
 
-public:
-    FunctionHooker() : m_verbose(false), m_initialized(false) {
-        debug_log_safe("Creating FunctionHooker");
-        m_hook = ThreadPoolHook::getInstance();
-        debug_log_safe("FunctionHooker created");
+    for (int i = 0; i < 3; i++) {
+        crt_handle = GetModuleHandleA(potential_dlls[i]);
+        if (crt_handle) {
+            sprintf_s(g_log_buffer, "Found CRT in: %s", potential_dlls[i]);
+            safe_log(g_log_buffer);
+            break;
+        }
     }
 
-    void setVerbose(bool verbose) {
+    // If not found, try loading explicitly
+    if (!crt_handle) {
+        crt_handle = LoadLibraryA("ucrtbase.dll");
+    }
+
+    // Still no CRT handle
+    if (!crt_handle) {
+        safe_log("ERROR: Failed to find CRT library");
+        return FALSE;
+    }
+
+    // Get function addresses
+    original_malloc = (MallocFuncType)GetProcAddress(crt_handle, "malloc");
+    original_free = (FreeFuncType)GetProcAddress(crt_handle, "free");
+    original_realloc = (ReallocFuncType)GetProcAddress(crt_handle, "realloc");
+    original_calloc = (CallocFuncType)GetProcAddress(crt_handle, "calloc");
+
+    // Check if we got all functions
+    if (!original_malloc || !original_free || !original_realloc || !original_calloc) {
+        sprintf_s(g_log_buffer, "Error: Failed to get all functions. malloc=%p, free=%p",
+            original_malloc, original_free);
+        safe_log(g_log_buffer);
+        return FALSE;
+    }
+
+    safe_log("Successfully initialized all CRT functions");
+    return TRUE;
+}
+
+// ----- Hook Manager Class -----
+class SimpleHookManager {
+private:
+    ThreadPoolHook* m_hook;
+    BOOL m_initialized;
+    BOOL m_verbose;
+
+public:
+    SimpleHookManager() : m_hook(NULL), m_initialized(FALSE), m_verbose(FALSE) {
+        // Initialize log
+        g_log_file = CreateFileA("hook_log.txt", GENERIC_WRITE, FILE_SHARE_READ,
+            NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+        if (g_log_file != INVALID_HANDLE_VALUE) {
+            safe_log("SimpleHookManager created");
+        }
+
+        // Get hook instance 
+        m_hook = ThreadPoolHook::getInstance();
+    }
+
+    ~SimpleHookManager() {
+        // Clean up
+        if (g_log_file != INVALID_HANDLE_VALUE) {
+            CloseHandle(g_log_file);
+            g_log_file = INVALID_HANDLE_VALUE;
+        }
+    }
+
+    void setVerbose(BOOL verbose) {
         m_verbose = verbose;
     }
 
-    bool hookMemoryFunctions() {
-        debug_log_safe("Hooking memory functions");
+    BOOL setupHooks() {
+        safe_log("Setting up memory hooks");
 
-        // Initialize function pointers first, before any hooking
+        // Initialize CRT functions if needed
         if (!m_initialized) {
-            if (!initialize_original_functions()) {
-                debug_log_safe("Failed to initialize original function pointers");
-                return false;
+            if (!initialize_crt_functions()) {
+                safe_log("Failed to initialize CRT functions");
+                return FALSE;
             }
-            m_initialized = true;
+            m_initialized = TRUE;
         }
 
-        // Hook all functions at once to minimize vulnerability window
-        bool success = true;
+        // Install hooks one by one with error checking
+        BOOL success = TRUE;
 
-        // We'll install all hooks before checking results to ensure atomicity
-        bool malloc_result = m_hook->hook(original_malloc, hooked_malloc, &original_malloc);
-        bool free_result = m_hook->hook(original_free, hooked_free, &original_free);
-        bool realloc_result = m_hook->hook(original_realloc, hooked_realloc, &original_realloc);
-        bool calloc_result = m_hook->hook(original_calloc, hooked_calloc, &original_calloc);
+        // Hook malloc
+        if (!m_hook->hook(original_malloc, hooked_malloc, &original_malloc)) {
+            safe_log("Failed to hook malloc");
+            success = FALSE;
+        }
 
-        // Log each result separately
-        sprintf_s(g_log_buffer, "Hook results - malloc: %d, free: %d, realloc: %d, calloc: %d",
-            malloc_result, free_result, realloc_result, calloc_result);
-        debug_log_safe(g_log_buffer);
+        // Hook free
+        if (!m_hook->hook(original_free, hooked_free, &original_free)) {
+            safe_log("Failed to hook free");
+            success = FALSE;
+        }
 
-        success = malloc_result && free_result && realloc_result && calloc_result;
+        // Hook realloc
+        if (!m_hook->hook(original_realloc, hooked_realloc, &original_realloc)) {
+            safe_log("Failed to hook realloc");
+            success = FALSE;
+        }
+
+        // Hook calloc
+        if (!m_hook->hook(original_calloc, hooked_calloc, &original_calloc)) {
+            safe_log("Failed to hook calloc");
+            success = FALSE;
+        }
+
+        if (success) {
+            safe_log("All memory hooks installed successfully");
+        }
+        else {
+            safe_log("One or more hooks failed");
+        }
 
         if (m_verbose) {
-            std::cout << "Memory allocation functions "
-                << (success ? "hooked successfully" : "hook failed") << std::endl;
+            // Use direct Windows API to avoid potential issues with cout
+            const char* message = success ?
+                "Memory allocation functions hooked successfully\r\n" :
+                "Memory allocation functions hook failed\r\n";
+            DWORD written;
+            WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), message, lstrlenA(message), &written, NULL);
         }
 
         return success;
     }
 
-    void unhookAll() {
-        debug_log_safe("Unhooking all functions");
-        m_hook->unhookAll();
-        debug_log_safe("All functions unhooked");
+    void removeHooks() {
+        safe_log("Removing all hooks");
+        if (m_hook) {
+            m_hook->unhookAll();
+        }
+        safe_log("All hooks removed");
 
         if (m_verbose) {
-            std::cout << "All hooks removed" << std::endl;
+            // Use direct Windows API to avoid potential issues with cout
+            const char* message = "All hooks removed\r\n";
+            DWORD written;
+            WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), message, lstrlenA(message), &written, NULL);
         }
     }
 
-    static FunctionHooker& getInstance() {
-        static FunctionHooker instance;
+    void setLogFile(const char* logPath) {
+        // Close existing log file
+        if (g_log_file != INVALID_HANDLE_VALUE) {
+            CloseHandle(g_log_file);
+            g_log_file = INVALID_HANDLE_VALUE;
+        }
+
+        // Open new log file if path provided
+        if (logPath) {
+            g_log_file = CreateFileA(logPath, GENERIC_WRITE, FILE_SHARE_READ,
+                NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+            if (g_log_file != INVALID_HANDLE_VALUE) {
+                sprintf_s(g_log_buffer, "Log file set to: %s", logPath);
+                safe_log(g_log_buffer);
+            }
+        }
+    }
+
+    // Singleton instance
+    static SimpleHookManager& getInstance() {
+        static SimpleHookManager instance;
         return instance;
     }
 };
 
-// External API
+// ----- Public API Functions -----
 extern "C" {
     __declspec(dllexport) bool SetupAllHooks(bool verbose) {
-        // Initialize debug log first
-        init_debug_log();
-        debug_log_safe("SetupAllHooks called");
-
-        FunctionHooker::getInstance().setVerbose(verbose);
-        bool result = FunctionHooker::getInstance().hookMemoryFunctions();
-
-        sprintf_s(g_log_buffer, "SetupAllHooks returning: %d", result);
-        debug_log_safe(g_log_buffer);
-        return result;
+        SimpleHookManager::getInstance().setVerbose(verbose);
+        return SimpleHookManager::getInstance().setupHooks();
     }
 
     __declspec(dllexport) bool SetupMemoryHooks(bool verbose) {
-        debug_log_safe("SetupMemoryHooks called");
-
-        FunctionHooker::getInstance().setVerbose(verbose);
-        bool result = FunctionHooker::getInstance().hookMemoryFunctions();
-
-        sprintf_s(g_log_buffer, "SetupMemoryHooks returning: %d", result);
-        debug_log_safe(g_log_buffer);
-        return result;
+        SimpleHookManager::getInstance().setVerbose(verbose);
+        return SimpleHookManager::getInstance().setupHooks();
     }
 
     __declspec(dllexport) void SetHookLogFile(const char* logFilePath) {
-        if (logFilePath) {
-            // Close existing log if open
-            if (g_debug_log.is_open()) {
-                g_debug_log.close();
-            }
-
-            // Open new log file
-            g_debug_log.open(logFilePath, std::ios::out | std::ios::trunc);
-            sprintf_s(g_log_buffer, "Logging redirected to: %s", logFilePath);
-            debug_log_safe(g_log_buffer);
-        }
+        SimpleHookManager::getInstance().setLogFile(logFilePath);
     }
 
     __declspec(dllexport) void RemoveAllHooks() {
-        debug_log_safe("RemoveAllHooks called");
-        FunctionHooker::getInstance().unhookAll();
-        debug_log_safe("RemoveAllHooks completed");
-
-        // Close debug log
-        if (g_debug_log.is_open()) {
-            g_debug_log << "Closing log" << std::endl;
-            g_debug_log.close();
-        }
+        SimpleHookManager::getInstance().removeHooks();
     }
 }

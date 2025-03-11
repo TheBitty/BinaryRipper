@@ -1,0 +1,5 @@
+[30225812] SimpleHookManager created
+[30225812] Setting up memory hooks
+[30225812] [30225812] n: ucrtbase.dll
+[30225812] Successfully initialized all CRT functions
+[30225812] All memory hooks installed successfully

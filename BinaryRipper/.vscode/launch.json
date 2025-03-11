@@ -14,11 +14,7 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "console": "externalTerminal",
-            "preLaunchTask": "build",
-            "logging": {
-                "moduleLoad": false,
-                "trace": true
-            }
+            "preLaunchTask": "build"
         },
         {
             "name": "Run Basic Overflow Test",
@@ -42,6 +38,24 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "console": "externalTerminal",
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Launch without debugging",
+            "type": "shell",
+            "request": "launch",
+            "command": "${workspaceFolder}/x64/Debug/BinaryRipper.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "build"
+        },
+        {
+            "name": "Run in Command Prompt",
+            "type": "shell",
+            "request": "launch",
+            "command": "cmd.exe",
+            "args": ["/c", "start", "cmd.exe", "/k", "${workspaceFolder}\\x64\\Debug\\BinaryRipper.exe"],
+            "cwd": "${workspaceFolder}",
             "preLaunchTask": "build"
         }
     ]
